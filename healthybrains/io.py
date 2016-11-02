@@ -28,6 +28,7 @@ class _Nifti1Source(beam.io.filebasedsource.FileBasedSource):
                     ]
             else:
                 data = array_proxy[..., 0]
+            range_tracker.record_current_position()
             yield (file_name, data)
 
 
@@ -65,6 +66,7 @@ class _NumpySource(beam.io.filebasedsource.FileBasedSource):
             data = np.load(f)
             if self._test_slice:
                 data = data[:10]
+            range_tracker.record_current_position()
             yield (file_name, data)
 
 
