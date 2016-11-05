@@ -88,3 +88,6 @@ class ReadNumpy(beam.transforms.PTransform):
                 file_pattern=self._file_pattern,
                 min_bundle_size=self._min_bundle_size,
                 test_slice=self._test_slice))
+
+
+
