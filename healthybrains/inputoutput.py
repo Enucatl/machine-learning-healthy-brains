@@ -2,6 +2,7 @@ import io
 import nibabel as nb
 import numpy as np
 import apache_beam as beam
+import os
 
 
 class _Nifti1Source(beam.io.filebasedsource.FileBasedSource):
@@ -48,3 +49,9 @@ def thickness_data_to_string((file_name, thickness)):
     np.save(output_string, thickness)
     final_string = output_string.getvalue()
     return final_string
+
+
+def id_from_file_name(file_name):
+    basename = os.path.splitext(os.path.basename(file_name))[0]
+    file_id = int(basename.split("_")[1])
+    return file_id

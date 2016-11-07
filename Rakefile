@@ -9,7 +9,7 @@ jobname = "#{project}-#{id}"
 
 namespace :frontal_thickness do
 
-  output = "#{bucket}/frontal_thickness/frontal_thickness-#{id}"
+  output = "#{bucket}/frontal_thickness/frontal_thickness-#{id}/output-"
   desc "calculate the frontal thickness on the cloud with only two test files"
   task :cloud_smaller do
     sh [
