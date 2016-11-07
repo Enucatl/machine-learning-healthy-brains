@@ -64,7 +64,7 @@ namespace :frontal_thickness do
       "--zone europe-west1-c",
       "--disk_size_gb 100",
       "--setup_file ./setup.py",
-      "--input \"#{bucket}/set_*/*.nii\"",
+      "--input \"#{bucket}/set_train/*.nii\"",
     ].join(" ")
   end
 
@@ -77,7 +77,7 @@ namespace :frontal_thickness do
   task :local_all do
     sh [
       "python frontal_thickness.py",
-      "--input \"data/set_*/*.nii\"",
+      "--input \"data/set_train/*.nii\"",
     ].join(" ")
   end
 

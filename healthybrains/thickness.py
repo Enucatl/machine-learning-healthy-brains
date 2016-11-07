@@ -14,6 +14,7 @@ def zoom((file_name, data), zoom):
     else:
         return file_name, data
 
+
 def solve_laplace(
         (file_name, data),
         csf_gm_threshold=650,
