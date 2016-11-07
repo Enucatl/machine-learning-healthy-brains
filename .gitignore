@@ -1,6 +1,7 @@
 sandbox
 data
 data.tar.gz
+output
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
