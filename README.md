@@ -7,3 +7,7 @@ http://journals.plos.org/plosone/article/asset?id=10.1371/journal.pone.0050698.P
 https://www.nitrc.org/frs/?group_id=432
 
 http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FNIRT/UserGuide
+
+# install vtk
+
+https://github.com/yyuu/pyenv/issues/65
