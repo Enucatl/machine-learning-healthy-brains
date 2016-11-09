@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 import scipy.ndimage
 import scipy.weave
+import logging
 
 
 def get_frontal_region((file_name, data)):
@@ -54,6 +55,7 @@ def solve_laplace(
         }
         }
         }
+        return_val = err;
         """
         e = scipy.weave.inline(
             code,
@@ -61,6 +63,7 @@ def solve_laplace(
             type_converters=scipy.weave.converters.blitz,
             compiler="gcc"
         )
+        n_iter += 1
         if e < eps: break
     return file_name, seed
 
@@ -143,7 +146,7 @@ def calculate_thickness(
     y = j;
     z = k;
     l2 = 0;
-    while (phi > 0 and l2 < max_l) {
+    while (phi < 1000 and l2 < max_l) {
         x_0 = std::round(x);
         if (x_0 < 0 or x_0 > nx - 1) {
             l2 = max_l;

@@ -15,13 +15,15 @@ ht = fread(args$health)
 setnames(ht, "V1", "health")
 ds = dist(dt, method="maximum")
 h = hclust(ds, method="complete")
+print(dt)
+
 
 clustering = as.dendrogram(h)
 colors = c("red", "blue")
 col.labels = function(x) {
     if (is.leaf(x)) {
         a = attributes(x)
-        color = colors[ht[a$label - 1, health] + 1]
+        color = colors[ht[a$label, health] + 1]
         attr(x, "nodePar") = c(a$nodePar, lab.col=color)
     }
     x
@@ -56,6 +58,7 @@ ht[, score := calc.score(prediction)]
 print(ht)
 
 binary.log.loss = ht[, sum(health * log(score) + (1 - health) * log(1 - score)) / (-.N)]
+print("binary.log.loss:")
 print(binary.log.loss)
 
 

@@ -28,10 +28,6 @@ def main(folder, output, zoom):
             stringio.seek(0)
             name = id_from_file_name(np.load(stringio)[0])
             thicknesses = np.load(stringio).flatten()
-            print(thicknesses.shape)
-            print(np.size(thicknesses[thicknesses > 0]))
-            print(np.size(thicknesses[np.logical_and(thicknesses > 0,
-                                                     thicknesses <= max_l)]))
             hist, _ = np.histogram(
                 thicknesses[
                     np.logical_and(
