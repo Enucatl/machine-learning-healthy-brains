@@ -37,7 +37,7 @@ def main(input_file):
     # ref_name = "../data/IIT_GM_Desikan_atlas_cropped.nii.gz"
     ref_name = "../data/IITmean_t1_cropped.nii.gz"
     flirt_command = "/usr/share/fsl/5.0/bin/flirt\
-    -in {input_file} -ref {ref}\
+    -in {ref} -ref {input_file}\
     -out {out} -omat {omat}\
     -bins 256 -cost mutualinfo\
     -searchrx 0 0 -searchry 0 0 -searchrz 0 0\
@@ -47,52 +47,53 @@ def main(input_file):
         omat=omat,
         ref=ref_name,
         )
+    print(flirt_command)
     # check_call(flirt_command, shell=True)
+    print("done.")
     atlas_name = "../data/IIT_GM_Desikan_atlas_cropped.nii.gz"
     affine = np.genfromtxt(omat).astype(int)
-    for region_name, desikan_label_id in desikan_label_ids.iteritems():
-        atlas = nb.load(atlas_name).get_data()
-        ref = nb.load(ref_name).get_data()
-        atlas[atlas != desikan_label_id] = 0
-        x, y, z = np.where(atlas == desikan_label_id)
-        margin = 15
-        x_min, x_max = np.min(x) - margin, np.max(x) + margin
-        y_min, y_max = np.min(y) - margin, np.max(y) + margin
-        z_min, z_max = np.min(z) - margin, np.max(z) + margin
-        x_0 = affine[0, 3]
-        y_0 = affine[1, 3]
-        z_0 = affine[2, 3]
-        ref_image = ref[
-            x_min:x_max,
-            y_min:y_max,
-            z_min:z_max
-        ]
-        image = nb.load(input_file).get_data()[
-            x_min - x_0:x_max - x_0,
-            y_min - y_0:y_max - y_0,
-            z_min - z_0:z_max - z_0,
-        ]
-        region_ref_name = os.path.join(
-            output_dir, region_name + "_atlas.nii.gz")
-        region_image_name = os.path.join(
-            output_dir, region_name + "_" + basename + ".nii.gz")
-        flirt_region_image_name = os.path.join(
-            output_dir, region_name + "_" + basename + "_flirt.nii.gz")
-        nb.save(nb.Nifti1Image(ref_image, np.eye(4)), region_ref_name)
-        nb.save(nb.Nifti1Image(image, np.eye(4)), region_image_name)
-        region_mat_name = region_image_name.replace(".nii.gz", ".mat")
-        flirt_command = "/usr/share/fsl/5.0/bin/flirt\
-        -in {input_file} -ref {ref}\
-        -out {out} -omat {omat}\
-        -bins 256 -cost mutualinfo\
-        -searchrx -20 20 -searchry -20 20 -searchrz -20 20\
-        -dof 12  -interp trilinear".format(
-            input_file=region_image_name,
-            out=flirt_region_image_name,
-            omat=region_mat_name,
-            ref=region_ref_name,
-            )
-        check_call(flirt_command, shell=True)
+    atlas = nb.load(atlas_name).get_data()
+    ref = nb.load(ref_name).get_data()
+    fnirt_image_name = os.path.join(
+        output_dir, basename + "_fnirt.nii.gz")
+    coefficients_file_name = os.path.join(
+        output_dir, basename + "_coefficients.nii.gz")
+    warp_field_name = os.path.join(
+        output_dir, basename + "_warp_field.nii.gz")
+    fnirt_command = "/usr/share/fsl/5.0/bin/fnirt\
+    --in={ref} --ref={input_file}\
+    --iout={out} --aff={aff}\
+    --cout={coefficients_file_name}\
+    --fout={fout}\
+    --warpres=10,10,10\
+    --subsamp=8,4,2,1\
+    --reffwhm=2,0,0,0\
+    --lambda=300,100,50,25\
+    --intmod=global_linear\
+    ".format(
+        input_file=input_file,
+        ref=ref_name,
+        out=fnirt_image_name,
+        aff=omat,
+        coefficients_file_name=coefficients_file_name,
+        fout=warp_field_name,
+        )
+    print(fnirt_command)
+    # check_call(fnirt_command, shell=True)
+    warped_atlas = os.path.join(
+        output_dir, basename + "_warped_atlas.nii.gz")
+    applyward_command = "/usr/lib/fsl/5.0/applywarp\
+    --ref={ref} --in={atlas_name} --warp={warp}\
+    --out={warped_atlas} --interp=nn\
+    ".format(
+        ref=input_file,
+        atlas_name=atlas_name,
+        warp=coefficients_file_name,
+        warped_atlas=warped_atlas
+    )
+    print(applyward_command)
+    check_call(applyward_command, shell=True)
+    print("done.")
 
 
 if __name__ == "__main__":

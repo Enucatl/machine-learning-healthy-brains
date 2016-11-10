@@ -1,6 +1,5 @@
 from __future__ import division, print_function
 import os
-from glob import glob
 import zlib
 import io
 import numpy as np
@@ -9,101 +8,116 @@ import tqdm
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk
 import itk
+import nibabel as nb
 
 from healthybrains.inputoutput import id_from_file_name
 
+desikan_label_ids = {
+    # "left_thalamus": 10,
+    # "right_thalamus": 49,
+    # "left_caudate": 11,
+    # "right_caudate": 50,
+    # "left_putamen": 12,
+    # "right_putamen": 51,
+    # "left_pallidum": 13,
+    # "right_pallidum": 52,
+    "left_hippocampus": 17,
+    # "right_hippocampus": 53,
+    # "left_amygdala": 18,
+    # "right_amygdala": 54,
+}
+
 
 @click.command()
-@click.argument("folder", nargs=1)
-@click.argument("output", nargs=1)
-@click.option("--zoom", type=int, default=1)
-def main(folder, output, zoom):
-    max_l = 20 * zoom
-    file_names = glob(os.path.join(folder, "*"))
+@click.argument("warp_field", nargs=1)
+@click.argument("warped_atlas", nargs=1)
+def main(warp_field, warped_atlas):
     wbits = zlib.MAX_WBITS | 16
-    arrays = np.zeros(shape=(len(file_names), max_l - 2))
-    for file_name in tqdm.tqdm(file_names):
-        decompressor = zlib.decompressobj(wbits)
-        with open(file_name, "rb") as infile:
-            stringio = io.BytesIO()
-            decompressed = decompressor.decompress(infile.read())
-            stringio.write(decompressed)
-            stringio.seek(0)
-            name = id_from_file_name(np.load(stringio)[0])
-            thicknesses = np.load(stringio)
-            thicknesses_vtk = numpy_to_vtk(
-                np.ravel(thicknesses, order="F"),
-                array_type=vtk.VTK_UNSIGNED_SHORT)
-            vtk_image = vtk.vtkImageData()
-            vtk_image.SetDimensions(thicknesses.shape)
-            # vtk_image.AllocateScalars(vtk.VTK_UNSIGNED_SHORT, 1)
-            vtk_image.GetPointData().SetScalars(thicknesses_vtk)
+    field = nb.load(warp_field).get_data()
+    atlas = nb.load(warped_atlas).get_data()
+    distances = np.linalg.norm(field, axis=3)
+    for region_name, desikan_label_id in desikan_label_ids.iteritems():
+        print(distances.shape)
+        print(field.shape)
+        print(atlas.shape)
+        region = atlas.astype(np.uint8)
+        region[region != desikan_label_id] = 0
+        region_vtk = numpy_to_vtk(
+            np.ravel(region, order="F"),
+            array_type=vtk.VTK_UNSIGNED_SHORT)
+        vtk_image = vtk.vtkImageData()
+        vtk_image.SetDimensions(region.shape)
+        # # vtk_image.AllocateScalars(vtk.VTK_UNSIGNED_SHORT, 1)
+        vtk_image.GetPointData().SetScalars(region_vtk)
 
-            #threshold
-            threshold = vtk.vtkImageThreshold()
-            threshold.SetInputData(vtk_image)
-            threshold.ThresholdBetween(1, 20)
-            threshold.ReplaceInOn()
-            threshold.SetInValue(20)
-            threshold.ReplaceOutOn()
-            threshold.SetOutValue(0)
-            threshold.Update()
+        dmc = vtk.vtkDiscreteMarchingCubes()
+        dmc.SetInputData(vtk_image)
+        dmc.GenerateValues(1, desikan_label_id, desikan_label_id)
 
-            # alpha_channel_function = vtk.vtkPiecewiseFunction()
-            # alpha_channel_function.AddPoint(0, 0)
-            # alpha_channel_function.AddPoint(100, 1)
-            # color_function = vtk.vtkColorTransferFunction()
-            # color_function.AddRGBPoint(50, 1, 0, 0)
-            # volume_property = vtk.vtkVolumeProperty()
-            # volume_property.SetColor(color_function)
-            # volume_property.SetScalarOpacity(alpha_channel_function)
-            # volume_mapper = vtk.vtkGPUVolumeRayCastMapper()
-            # volume_mapper.SetInputConnection(threshold.GetOutputPort())
-            # # volume_mapper.SetInputData(vtk_image)
-            # volume = vtk.vtkVolume()
-            # volume.SetMapper(volume_mapper)
-            # volume.SetProperty(volume_property)
-            # renderer = vtk.vtkRenderer()
-            # render_window = vtk.vtkRenderWindow()
-            # render_window.AddRenderer(renderer)
-            # renderer_interaction = vtk.vtkRenderWindowInteractor()
-            # renderer_interaction.SetRenderWindow(render_window)
-            # renderer.AddVolume(volume)
-            # renderer.SetBackground(0, 0, 0)
-            # render_window.SetSize(1200, 1200)
-            # def exit_check(obj, event):
-                # if obj.GetEventPending() != 0:
-                    # obj.SetAbortRender(1)
+        normals = vtk.vtkPolyDataNormals()
+        normals.SetAutoOrientNormals(1)
+        normals.SetInputConnection(dmc.GetOutputPort())
+        normals.Update()
 
-            dmc = vtk.vtkDiscreteMarchingCubes()
-            dmc.SetInputConnection(threshold.GetOutputPort())
-            dmc.GenerateValues(1, 20, 20)
-            dmc.Update()
+        polygon = normals.GetOutput()
+        n = polygon.GetNumberOfPoints()
+        distance = vtk.vtkFloatArray()
+        distance.SetName("distance")
+        for i in range(n):
+            point = polygon.GetPoint(i)
+            normal = polygon.GetPointData().GetNormals().GetTuple(i)
+            x, y, z = int(point[0]), int(point[1]), int(point[2])
+            d = distances[x, y, z]
+            sign = np.dot(field[x, y, z], np.array(normal))
+            sign = 1 if sign >= 0 else -1
+            distance.InsertNextValue(d * sign)
+        polygon.GetPointData().AddArray(distance)
+        polygon.GetPointData().SetActiveScalars("distance")
 
-            # render
-            mapper = vtk.vtkPolyDataMapper()
-            mapper.SetInputConnection(dmc.GetOutputPort())
-            actor = vtk.vtkActor()
-            actor.SetMapper(mapper)
-            renderer = vtk.vtkRenderer()
-            render_window = vtk.vtkRenderWindow()
-            render_window.AddRenderer(renderer)
-            renderer_interaction = vtk.vtkRenderWindowInteractor()
-            renderer_interaction.SetRenderWindow(render_window)
-            renderer.AddActor(actor)
-            renderer.SetBackground(0, 0, 0)
-            render_window.SetSize(600, 600)
-            def exit_check(obj, event):
-                if obj.GetEventPending() != 0:
-                    obj.SetAbortRender(1)
-            
-            # Tell the application to use the function as an exit check.
-            render_window.AddObserver("AbortCheckEvent", exit_check)
-            
-            renderer_interaction.Initialize()
-            # Because nothing will be rendered without any input, we order the first render manually before control is handed over to the main-loop.
-            render_window.Render()
-            renderer_interaction.Start()
+        mesh_file_name = warp_field.replace(
+            "warp_field.nii.gz", region_name + "_mesh.vtk")
+        writer = vtk.vtkPolyDataWriter()
+        writer.SetInputData(polygon)
+        writer.SetFileName(mesh_file_name)
+        writer.Update()
+
+        itk_reader = itk.MeshFileReader()
+
+        min_d, max_d = distance.GetRange()
+        colorLookupTable= vtk.vtkLookupTable()
+        colorLookupTable.SetHueRange(2 / 3, 1)
+        #colorLookupTable.SetSaturationRange(0, 0)
+        #colorLookupTable.SetValueRange(1, 0)
+        #colorLookupTable.SetNumberOfColors(256) #256 default
+        colorLookupTable.Build()
+
+        # render
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputData(polygon)
+        mapper.ScalarVisibilityOn()
+        mapper.SetScalarRange(min_d, max_d)
+        mapper.SetScalarModeToUsePointData()
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        renderer = vtk.vtkRenderer()
+        render_window = vtk.vtkRenderWindow()
+        render_window.AddRenderer(renderer)
+        renderer_interaction = vtk.vtkRenderWindowInteractor()
+        renderer_interaction.SetRenderWindow(render_window)
+        renderer.AddActor(actor)
+        renderer.SetBackground(0, 0, 0)
+        render_window.SetSize(600, 600)
+        def exit_check(obj, event):
+            if obj.GetEventPending() != 0:
+                obj.SetAbortRender(1)
+        
+        # Tell the application to use the function as an exit check.
+        render_window.AddObserver("AbortCheckEvent", exit_check)
+        
+        renderer_interaction.Initialize()
+        # Because nothing will be rendered without any input, we order the first render manually before control is handed over to the main-loop.
+        render_window.Render()
+        renderer_interaction.Start()
         break
     # np.save(output, arrays)
 
