@@ -5,17 +5,6 @@ import scipy.weave
 import logging
 
 
-def get_frontal_region((file_name, data)):
-    return file_name, data[10:160, 120:190, 45:160]
-
-
-def zoom((file_name, data), zoom):
-    if zoom > 1:
-        return file_name, scipy.ndimage.interpolation.zoom(data, zoom)
-    else:
-        return file_name, data
-
-
 def solve_laplace(
         (file_name, data),
         csf_gm_threshold=650,

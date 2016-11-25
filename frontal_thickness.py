@@ -18,12 +18,6 @@ class ThicknessOptions(beam.utils.options.PipelineOptions):
             dest="output",
             default="output/cortical_thickness"
         )
-        parser.add_argument(
-            "--zoom",
-            dest="zoom",
-            type=int,
-            default=1
-        )
 
 
 if __name__ == "__main__":
@@ -34,11 +28,9 @@ if __name__ == "__main__":
     datasets = (
         p
         | "ReadDataset" >> healthybrains.inputoutput.ReadNifti1(options.input)
-        | beam.core.Map(healthybrains.thickness.get_frontal_region)
-        | beam.core.Map(healthybrains.thickness.zoom, options.zoom)
         | beam.core.Map(healthybrains.thickness.solve_laplace)
         | beam.core.Map(
-            healthybrains.thickness.calculate_thickness, 20 * options.zoom)
+            healthybrains.thickness.calculate_thickness, 20)
         | beam.core.Map(healthybrains.inputoutput.thickness_data_to_string)
         | beam.io.WriteToText(
             options.output,

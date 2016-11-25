@@ -81,8 +81,6 @@ def main(warp_field, warped_atlas):
         writer.SetFileName(mesh_file_name)
         writer.Update()
 
-        itk_reader = itk.MeshFileReader()
-
         min_d, max_d = distance.GetRange()
         colorLookupTable= vtk.vtkLookupTable()
         colorLookupTable.SetHueRange(2 / 3, 1)
