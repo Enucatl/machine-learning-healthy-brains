@@ -38,7 +38,7 @@ def main(train_fc, train_c, train_fc_groups, train_c_groups, test_fc, test_c):
     dubious = np.where(np.logical_and(
         fc_group_meaning != np.max(fc_group_meaning),
         fc_group_meaning != np.min(fc_group_meaning)))[0][0]
-    print(healthy, diseased, dubious)
+    status = (healthy, diseased, dubious)
     c_group_meaning = np.zeros(3, dtype=np.float)
     for i in range(3):
         selected_healths = train_health[
@@ -51,7 +51,7 @@ def main(train_fc, train_c, train_fc_groups, train_c_groups, test_fc, test_c):
     c_dubious = np.where(np.logical_and(
         c_group_meaning != np.max(c_group_meaning),
         c_group_meaning != np.min(c_group_meaning)))[0][0]
-    print(c_healthy, c_diseased, c_dubious)
+    c_status = (c_healthy, c_diseased, c_dubious)
     print(c_group_meaning)
     diagnosis = []
     for test_frontal_central, test_cerebellum in zip(test_fc, test_c):
@@ -71,8 +71,8 @@ def main(train_fc, train_c, train_fc_groups, train_c_groups, test_fc, test_c):
             metric="chebyshev"
         ))
         distances = np.array((
-            d_from_diseased,
             d_from_healthy,
+            d_from_diseased,
             d_from_dubious))
         min_dist = np.argmin(distances)
         if min_dist == dubious:
@@ -96,9 +96,9 @@ def main(train_fc, train_c, train_fc_groups, train_c_groups, test_fc, test_c):
                 d_from_healthy,
                 d_from_dubious))
             min_dist = np.argmin(distances)
-            diagnosis.append(c_group_meaning[min_dist])
+            diagnosis.append(c_group_meaning[c_status[min_dist]])
         else:
-            diagnosis.append(fc_group_meaning[min_dist])
+            diagnosis.append(fc_group_meaning[status[min_dist]])
 
     with open("prediction.csv", "w") as output_file:
         writer = csv.writer(output_file)
