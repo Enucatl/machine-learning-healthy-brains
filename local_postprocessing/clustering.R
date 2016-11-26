@@ -31,7 +31,7 @@ col.labels = function(x) {
 
 dend = dendrapply(clustering, col.labels)
 
-predictions = cutree(h, 2)
+predictions = cutree(h, 3)
 ht[, prediction := predictions]
 output.table = data.table(group=predictions)
 print(output.table)

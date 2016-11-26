@@ -46,6 +46,8 @@ def main(train_fc, train_c, train_fc_groups, train_c_groups, test_fc, test_c):
                 train_c_groups == i,
                 train_fc_groups == dubious)]
         c_group_meaning[i] = np.sum(selected_healths) / np.size(selected_healths)
+    print(c_group_meaning)
+    c_group_meaning[0] += 0.01
     c_healthy = np.argmax(c_group_meaning)
     c_diseased = np.argmin(c_group_meaning)
     c_dubious = np.where(np.logical_and(
