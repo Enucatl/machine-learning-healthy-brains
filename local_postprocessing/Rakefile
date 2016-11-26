@@ -45,21 +45,15 @@ end
 namespace :cluster do
 
   train_frontal_central = Rake::FileList["../data/thickness_histograms-matteo-1479386566/*frontal_central_cumulative.npy"]
-  train_cerebellum = Rake::FileList["../data/thickness_histograms-matteo-1479386566/*cerebellum_cumulative.npy"]
   test_frontal_central = Rake::FileList["../data/thickness_histograms-matteo-1480081355/*frontal_central_cumulative.npy"]
-  test_cerebellum = Rake::FileList["../data/thickness_histograms-matteo-1480081355/*cerebellum_cumulative.npy"]
 
   train_fc_cumulative = "../data/thickness_histograms-matteo-1479386566_frontal_central_cumulative.npy"
-  train_c_cumulative = "../data/thickness_histograms-matteo-1479386566_cerebellum_cumulative.npy"
   test_fc_cumulative = "../data/thickness_histograms-matteo-1480081355_frontal_central_cumulative.npy"
-  test_c_cumulative = "../data/thickness_histograms-matteo-1480081355_cerebellum_cumulative.npy"
   clustering = "clustering.py"
 
   to_cluster = {
     train_fc_cumulative => train_frontal_central,
-    train_c_cumulative => train_cerebellum,
     test_fc_cumulative => test_frontal_central,
-    test_c_cumulative => test_cerebellum,
   }
 
   for key, value in to_cluster
@@ -73,31 +67,23 @@ namespace :cluster do
   task :gather_cumulative => to_cluster.keys
 
   train_fc_groups = "../data/groups_frontal_central.csv"
-  train_c_groups = "../data/groups_cerebellum.csv"
-  clutering_r = "clustering.R"
+  clustering_r = "clustering.R"
 
   desc train_fc_groups
-  file train_fc_groups => [clutering_r, train_fc_cumulative] do |t|
-    sh "./#{t.source} #{t.prerequisites[1]} ../data/targets.csv #{t.name}"
-  end
-
-  desc train_c_groups
-  file train_c_groups => [clutering_r, train_c_cumulative] do |t|
+  file train_fc_groups => [clustering_r, train_fc_cumulative] do |t|
     sh "./#{t.source} #{t.prerequisites[1]} ../data/targets.csv #{t.name}"
   end
 
   desc "groups from training data"
-  task :train_groups => [train_fc_groups, train_c_groups]
+  task :train_groups => [train_fc_groups]
 
   desc "prediction"
   file "prediction.csv" => [
     "predict_final.py",
     train_fc_cumulative,
-    train_c_cumulative,
     train_fc_groups,
-    train_c_groups,
     test_fc_cumulative,
-    test_c_cumulative] do |t|
+    ] do |t|
       sh "python #{t.prerequisites.join(' ')}"
   end
 
