@@ -2,8 +2,8 @@ require "time"
 now = Time.now.to_i
 user = ENV["USER"]
 id = "#{user}-#{now}"
-project = "ml-healthy-brains"
-bucket = "gs://mlp2-data"
+project = "machine-learning-aging-brains"
+bucket = "gs://mlp1-data-high-avail"
 
 jobname = "#{project}-#{id}"
 
@@ -46,6 +46,25 @@ namespace :frontal_thickness do
       "--setup_file ./setup.py",
       "--input \"#{bucket}/set_train/*.nii\"",
       "--zoom 3",
+    ].join(" ")
+  end
+
+  desc "calculate the frontal thickness on the cloud with test files"
+  task :cloud_test do
+    sh [
+      "python frontal_thickness.py",
+      "--project #{project}",
+      "--job_name #{jobname}",
+      "--runner DataflowPipelineRunner",
+      "--max_num_workers 24",
+      "--autoscaling_algorithm THROUGHPUT_BASED",
+      "--staging_location #{bucket}/staging",
+      "--temp_location #{bucket}/temp",
+      "--output #{output}",
+      "--zone europe-west1-c",
+      "--disk_size_gb 100",
+      "--setup_file ./setup.py",
+      "--input \"#{bucket}/set_test/*.nii\"",
     ].join(" ")
   end
 

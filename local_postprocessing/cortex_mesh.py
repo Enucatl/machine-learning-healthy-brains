@@ -30,7 +30,7 @@ def main(file_names, targets, show):
         file_id = id_from_file_name(name)
         health = int(open(targets, "r").readlines()[file_id - 1])
         cortex = np.load(stringio)
-        cortex[cortex > 7] = 0
+        cortex[cortex > 12] = 0
         cortex_mask = np.zeros_like(cortex, dtype=np.uint8)
         cortex_mask[cortex > 0] = 1
         region_vtk = numpy_to_vtk(
@@ -54,21 +54,18 @@ def main(file_names, targets, show):
         thickness = vtk.vtkFloatArray()
         thickness.SetName("thickness")
         d = 0
-        counter = 0
         for i in range(n):
             point = polygon.GetPoint(i)
             x, y, z = int(point[0]), int(point[1]), int(point[2])
             if cortex[x, y, z] > 0:
                 d = cortex[x, y, z]
-                counter += 1
             thickness.InsertNextValue(d)
         polygon.GetPointData().AddArray(thickness)
         polygon.GetPointData().SetActiveScalars("thickness")
-        print(n, counter, counter / n)
 
         mesh_file_name = file_name.replace(
-            ".npy.gz", "_mesh_{0}.vtk".format(
-            health))
+            ".npy.gz", "_mesh_{0}_{1}.vtk".format(
+            file_id, health))
         writer = vtk.vtkPolyDataWriter()
         writer.SetInputData(polygon)
         writer.SetFileName(mesh_file_name)
@@ -101,7 +98,7 @@ def main(file_names, targets, show):
             actor.SetMapper(mapper)
             color_bar = vtk.vtkScalarBarActor()
             color_bar.SetLookupTable(mapper.GetLookupTable())
-            color_bar.SetTitle("thickness {0}".format(health))
+            color_bar.SetTitle("thickness {0} {1}".format(file_id, health))
             color_bar.SetNumberOfLabels(6)
             renderer = vtk.vtkRenderer()
             render_window = vtk.vtkRenderWindow()

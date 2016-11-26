@@ -1,34 +1,27 @@
 from __future__ import division, print_function
 import click
 import numpy as np
+import os
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.cluster import AffinityPropagation
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics import log_loss
+from sklearn import svm
+from sklearn.model_selection import KFold
 
 
 @click.command()
-@click.argument("input_file")
-@click.option("--ground_truth_file", default="../data/targets.csv")
-def main(input_file, ground_truth_file):
-    arrays = np.load(input_file)
-    labels_true = np.genfromtxt(ground_truth_file)
-    print(arrays.shape)
-    distance = pairwise_distances(arrays, metric="chebyshev")
-    print(distance.shape)
-    agglomerative_clustering = AgglomerativeClustering(
-        n_clusters=2,
-        linkage="complete",
-        affinity="precomputed")
-    agglomerative_clustering.fit(distance)
-    labels_pred = agglomerative_clustering.labels_
-    print(adjusted_rand_score(labels_pred, labels_true))
-    affinity_propagation = AffinityPropagation(
-        affinity="precomputed",
-    )
-    affinity_propagation.fit(distance)
-    labels_pred = affinity_propagation.labels_
-    print(adjusted_rand_score(labels_pred, labels_true))
+@click.argument("output_file", nargs=1)
+@click.argument("input_files", nargs=-1)
+def main(output_file, input_files):
+    arrays = np.zeros((len(input_files), 11), dtype=np.float)
+    for input_file in input_files:
+        basename = os.path.basename(input_file).split("_")
+        file_id = int(basename[2])
+        array = np.load(input_file)
+        arrays[file_id - 1, :] = array
+    np.save(output_file, arrays)
 
 
 if __name__ == "__main__":

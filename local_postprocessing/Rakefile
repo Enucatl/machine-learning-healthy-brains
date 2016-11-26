@@ -1,109 +1,104 @@
 require "rake"
 
-ref_name = "../data/cropped/IITmean_t1.nii_cropped.nii.gz"
-ref_mask = "../data/cropped/IITmean_t1.nii_cropped_mask.nii.gz"
-atlas_name = "../data/cropped/IIT_GM_Desikan_atlas.nii_cropped.nii.gz"
-files = Rake::FileList["../data/cropped/t*_cropped.nii.gz"]
-warped_atlases = []
-
-namespace :fsl do
-
-  for file in files
-
-    basename = File.basename(file, ".nii.gz")
-    output_dir = "../data/fsl/#{basename}"
-    directory output_dir
-
-    omat = "#{output_dir}/#{basename}.mat"
-    desc "flirt file #{basename}"
-    file omat => [file, output_dir] do |t|
-      sh "/usr/share/fsl/5.0/bin/flirt " <<
-      "-in #{ref_name} -ref #{t.source} " <<
-      "-omat #{t.name} " <<
-      "-bins 256 -cost mutualinfo " <<
-      "-searchrx 0 0 -searchry 0 0 -searchrz 0 0 " <<
-      "-dof 12 -interp trilinear "
+namespace :histograms do
+  meshes = Rake::FileList["../data/frontal_thickness-matteo-1479386566/*.vtk"]
+  outputs = []
+  for mesh in meshes do
+    dirname = File.dirname(mesh).gsub(
+      "frontal_thickness", "thickness_histograms")
+    directory dirname
+    output_name = File.join(
+      dirname,
+      File.basename(mesh, ".vtk") + "_frontal_hist.npy")
+    desc output_name 
+    file output_name => [mesh, dirname, "mesh_to_histograms.py"] do |t|
+      sh "python #{t.prerequisites[2]} #{t.source}"
     end
-
-    mask = file.gsub("_cropped", "_cropped_mask")
-    warp_field = "#{output_dir}/#{basename}_warp_field.nii.gz"
-    desc "fnirt warp field #{basename}"
-    file warp_field => [omat, file, mask, output_dir] do |t|
-      sh "/usr/share/fsl/5.0/bin/fnirt " <<
-      "--in=#{ref_name} --ref=#{t.prerequisites[1]} " <<
-      "--aff=#{t.source} " <<
-      "--fout=#{t.name} " <<
-      "--inmask=#{ref_mask} " <<
-      "--refmask=#{t.prerequisites[2]} " <<
-      "--warpres=10,10,10 " <<
-      "--subsamp=8,4,2,1 " <<
-      "--reffwhm=2,0,0,0 " <<
-      "--lambda=300,100,50,25 " <<
-      "--intmod=global_linear"
-    end
-
-    warped_atlas = "#{output_dir}/#{basename}_warped_atlas.nii.gz"
-    desc "apply warp field to atlas #{basename}"
-    file warped_atlas => [warp_field, file, output_dir] do |t|
-      sh "/usr/lib/fsl/5.0/applywarp " <<
-      "--ref=#{t.prerequisites[1]} --in=#{atlas_name} --warp=#{t.source} " <<
-      "--out=#{t.name} --interp=nn"
-    end
-    warped_atlases.push warped_atlas
-
+    outputs.push output_name
   end
 
-  desc "warp all images"
-  multitask :all => warped_atlases
+  test_meshes = Rake::FileList["../data/frontal_thickness-matteo-1480081355/*.vtk"]
+  test_outputs = []
+  for mesh in test_meshes do
+    dirname = File.dirname(mesh).gsub(
+      "frontal_thickness", "thickness_histograms")
+    directory dirname
+    output_name = File.join(
+      dirname,
+      File.basename(mesh, ".vtk") + "_frontal_hist.npy")
+    desc output_name 
+    file output_name => [mesh, dirname, "mesh_to_histograms.py"] do |t|
+      sh "python #{t.prerequisites[2]} #{t.source}"
+    end
+    test_outputs.push output_name
+  end
+
+  desc "all test histograms"
+  multitask :test => test_outputs
+
+  desc "all train histograms"
+  multitask :train => outputs
 
 end
 
-namespace :spom do
 
-  region_names = []
-  for warped_atlas in warped_atlases
+namespace :cluster do
 
-    region_name = warped_atlas.gsub("_warped_atlas.nii.gz", "_left_thalamus.nrrd")
-    region_names.push region_name
-    desc "split atlas into regions #{region_name}"
-    file region_name => [warped_atlas, "split_regions.py"] do |t|
-      sh "python #{t.prerequisites[1]} #{t.source}"
-    end
+  train_frontal_central = Rake::FileList["../data/thickness_histograms-matteo-1479386566/*frontal_central_cumulative.npy"]
+  train_cerebellum = Rake::FileList["../data/thickness_histograms-matteo-1479386566/*cerebellum_cumulative.npy"]
+  test_frontal_central = Rake::FileList["../data/thickness_histograms-matteo-1480081355/*frontal_central_cumulative.npy"]
+  test_cerebellum = Rake::FileList["../data/thickness_histograms-matteo-1480081355/*cerebellum_cumulative.npy"]
 
-  end
+  train_fc_cumulative = "../data/thickness_histograms-matteo-1479386566_frontal_central_cumulative.npy"
+  train_c_cumulative = "../data/thickness_histograms-matteo-1479386566_cerebellum_cumulative.npy"
+  test_fc_cumulative = "../data/thickness_histograms-matteo-1480081355_frontal_central_cumulative.npy"
+  test_c_cumulative = "../data/thickness_histograms-matteo-1480081355_cerebellum_cumulative.npy"
+  clustering = "clustering.py"
 
-  desc "split all atlases"
-  multitask :split_atlases => region_names
-
-  desikan_label_ids = {
-      "left_thalamus" => 10,
-      "right_thalamus" => 49,
-      "left_caudate" => 11,
-      "right_caudate" => 50,
-      "left_putamen" => 12,
-      "right_putamen" => 51,
-      "left_pallidum" => 13,
-      "right_pallidum" => 52,
-      "left_hippocampus" => 17,
-      "right_hippocampus" => 53,
-      "left_amygdala" => 18,
-      "right_amygdala" => 54,
+  to_cluster = {
+    train_fc_cumulative => train_frontal_central,
+    train_c_cumulative => train_cerebellum,
+    test_fc_cumulative => test_frontal_central,
+    test_c_cumulative => test_cerebellum,
   }
 
-  for region_name in desikan_label_ids.keys
-    folder = "../data/lists/#{region_name}"
-    directory folder
-
-    desc region_name
-    task region_name => folder do |t|
-      Dir.chdir(t.source) do
-        p region_name
-        sh "~/src/SPoM/sumOfTwoPoisson/mainSumOfTwoPoissonShapeAnalysis list1.txt list0.txt mean_image.nii mean_vtp.vtp"
-      end
+  for key, value in to_cluster
+    desc key
+    file key => ([clustering] + value.to_a) do |t|
+      sh "python #{t.source} #{t.name} #{t.prerequisites.drop(1).join(' ')}"
     end
   end
 
-  desc "all poisson analyses"
-  task :all => desikan_label_ids.keys
+  desc "create all cumulative arrays"
+  task :gather_cumulative => to_cluster.keys
+
+  train_fc_groups = "../data/groups_frontal_central.csv"
+  train_c_groups = "../data/groups_cerebellum.csv"
+  clutering_r = "clustering.R"
+
+  desc train_fc_groups
+  file train_fc_groups => [clutering_r, train_fc_cumulative] do |t|
+    sh "./#{t.source} #{t.prerequisites[1]} ../data/targets.csv #{t.name}"
+  end
+
+  desc train_c_groups
+  file train_c_groups => [clutering_r, train_c_cumulative] do |t|
+    sh "./#{t.source} #{t.prerequisites[1]} ../data/targets.csv #{t.name}"
+  end
+
+  desc "groups from training data"
+  task :train_groups => [train_fc_groups, train_c_groups]
+
+  desc "prediction"
+  file "prediction.csv" => [
+    "predict_final.py",
+    train_fc_cumulative,
+    train_c_cumulative,
+    train_fc_groups,
+    train_c_groups,
+    test_fc_cumulative,
+    test_c_cumulative] do |t|
+      sh "python #{t.prerequisites.join(' ')}"
+  end
 
 end

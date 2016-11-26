@@ -5,21 +5,19 @@ import zlib
 import io
 import numpy as np
 import click
-import tqdm
+from tqdm import tqdm
+import pandas as pd
 
 from healthybrains.inputoutput import id_from_file_name
 
 
 @click.command()
-@click.argument("folder", nargs=1)
-@click.argument("output", nargs=1)
-@click.option("--zoom", type=int, default=1)
-def main(folder, output, zoom):
-    max_l = 20 * zoom
-    file_names = glob(os.path.join(folder, "*"))
+@click.argument("file_names", nargs=-1)
+def main(file_names, output):
+    max_l = 20
     wbits = zlib.MAX_WBITS | 16
     arrays = np.zeros(shape=(len(file_names), max_l - 2))
-    for file_name in tqdm.tqdm(file_names):
+    for file_name in tqdm(file_names):
         decompressor = zlib.decompressobj(wbits)
         with open(file_name, "rb") as infile:
             stringio = io.BytesIO()
@@ -27,7 +25,10 @@ def main(folder, output, zoom):
             stringio.write(decompressed)
             stringio.seek(0)
             name = id_from_file_name(np.load(stringio)[0])
-            thicknesses = np.load(stringio).flatten()
+            cortex = np.load(stringio).flatten()
+            frontal = cortex[40:130, 140:190, 45:160]
+            central = cortex[25:150, 70:125, 75:150]
+            cerebellum = cortex[40:130, 35:90, 15:40]
             hist, _ = np.histogram(
                 thicknesses[
                     np.logical_and(
